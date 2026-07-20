@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reportes — Puelche</title>
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --puelche-blue: #1e3a5f;
+    --puelche-blue-light: #2c5282;
+    --bg: #f4f6f8;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 16px 40px;
+    color: #1f2937;
+    background: var(--bg);
+  }
+  header.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 0 12px;
+  }
+  header.brand .logo-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: var(--puelche-blue);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+  header.brand .brand-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--puelche-blue);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  nav.tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  nav.tabs a {
+    flex: 1;
+    text-align: center;
+    padding: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--puelche-blue);
+    background: white;
+    border: 1px solid #d1d5db;
+  }
+  nav.tabs a.active {
+    background: var(--puelche-blue);
+    color: white;
+    border-color: var(--puelche-blue);
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; color: #111827; }
+  p.subtitle { color: #6b7280; font-size: 14px; margin-top: 0; }
+  .card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    padding: 12px;
+    margin-top: 12px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #e5e7eb; }
+  th { color: #6b7280; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge.pendiente { background: #fef3c7; color: #92400e; }
+  .badge.rendida { background: #d1fae5; color: #065f46; }
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .total { font-weight: 600; font-size: 14px; }
+  button {
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--puelche-blue);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button:hover { background: var(--puelche-blue-light); }
+  button:disabled { background: #9ca3af; cursor: not-allowed; }
+  #status {
+    margin-top: 14px;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: none;
+  }
+  #status.ok { background: #ecfdf5; border: 1px solid #10b981; display: block; }
+  #status.error { background: #fef2f2; border: 1px solid #ef4444; display: block; }
+  #loading { text-align: center; color: #6b7280; font-size: 14px; padding: 20px 0; }
+  a { color: var(--puelche-blue-light); }
+</style>
+</head>
+<body>
+  <header class="brand">
+    <div class="logo-badge">PH</div>
+    <div class="brand-name">Puelche</div>
+  </header>
+
+  <nav class="tabs">
+    <a href="index.html">Subir boleta</a>
+    <a href="reportes.html" class="active">Reportes</a>
+  </nav>
+
+  <h1>Reportes de rendición</h1>
+  <p class="subtitle">Elegí las boletas que querés incluir y generá un reporte consolidado en PDF. Al generarlo, quedan marcadas como "Rendida".</p>
+
+  <div id="loading">Cargando rendiciones…</div>
+
+  <div class="card" id="tableCard" style="display:none;">
+    <table>
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="checkAll"></th>
+          <th>Fecha</th>
+          <th>Quién</th>
+          <th>Categoría</th>
+          <th>Monto</th>
+          <th>Foto</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="toolbar">
+    <div class="total" id="totalSeleccionado">Seleccionado: $0.00</div>
+    <button id="generarBtn" disabled>Generar reporte PDF</button>
+  </div>
+
+  <div id="status"></div>
+
+<script>
+  // Pegar acá la URL del Google Apps Script Web App (termina en /exec)
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyhN0Ru31Lg7N5lxJHDiQ5Pi01lhv8Vn3KwX_6EFz1J-pJU3Xsdm9MTZgIgL-C3iSX0LA/exec';
+
+  const loading = document.getElementById('loading');
+  const tableCard = document.getElementById('tableCard');
+  const tbody = document.getElementById('tbody');
+  const checkAll = document.getElementById('checkAll');
+  const generarBtn = document.getElementById('generarBtn');
+  const totalSeleccionado = document.getElementById('totalSeleccionado');
+  const status = document.getElementById('status');
+
+  let rendiciones = [];
+
+  function money(n) {
+    return '$' + (Number(n) || 0).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function actualizarTotal() {
+    const seleccionadas = Array.from(tbody.querySelectorAll('input[type=checkbox]:checked'));
+    const total = seleccionadas.reduce((acc, cb) => acc + Number(cb.dataset.monto || 0), 0);
+    totalSeleccionado.textContent = 'Seleccionado: ' + money(total);
+    generarBtn.disabled = seleccionadas.length === 0;
+  }
+
+  function render() {
+    tbody.innerHTML = '';
+    rendiciones.forEach((r) => {
+      const tr = document.createElement('tr');
+      const esRendida = (r.estado || '').toLowerCase() === 'rendida';
+      const fecha = r.fecha ? new Date(r.fecha).toLocaleString('es-CL') : '';
+
+      tr.innerHTML =
+        '<td><input type="checkbox" data-row="' + r.rowNumber + '" data-monto="' + r.monto + '" ' + (esRendida ? 'disabled' : '') + '></td>' +
+        '<td>' + fecha + '</td>' +
+        '<td>' + (r.quien || '') + '</td>' +
+        '<td>' + (r.categoria || '') + '</td>' +
+        '<td>' + money(r.monto) + '</td>' +
+        '<td>' + (r.link ? '<a href="' + r.link + '" target="_blank" rel="noopener">Ver</a>' : '') + '</td>' +
+        '<td><span class="badge ' + (esRendida ? 'rendida' : 'pendiente') + '">' + (r.estado || 'Pendiente') + '</span></td>';
+
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('input[type=checkbox]').forEach((cb) => {
+      cb.addEventListener('change', actualizarTotal);
+    });
+    actualizarTotal();
+  }
+
+  async function cargarRendiciones() {
+    loading.style.display = 'block';
+    tableCard.style.display = 'none';
+    try {
+      const res = await fetch(APPS_SCRIPT_URL + '?action=list');
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'No se pudo cargar el listado.');
+      rendiciones = data.rendiciones || [];
+      render();
+      tableCard.style.display = 'block';
+    } catch (err) {
+      status.className = 'error';
+      status.textContent = '❌ ' + err.message;
+    } finally {
+      loading.style.display = 'none';
+    }
+  }
+
+  checkAll.addEventListener('change', () => {
+    tbody.querySelectorAll('input[type=checkbox]:not(:disabled)').forEach((cb) => {
+      cb.checked = checkAll.checked;
+    });
+    actualizarTotal();
+  });
+
+  generarBtn.addEventListener('click', async () => {
+    const rows = Array.from(tbody.querySelectorAll('input[type=checkbox]:checked'))
+      .map((cb) => Number(cb.dataset.row));
+
+    if (!rows.length) return;
+
+    status.className = '';
+    status.style.display = 'none';
+    generarBtn.disabled = true;
+    generarBtn.textContent = 'Generando...';
+
+    try {
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'reporte', rows }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Error generando el reporte.');
+
+      status.className = 'ok';
+      status.style.display = 'block';
+      status.innerHTML = '✅ Reporte generado.<br><a href="' + data.link + '" target="_blank" rel="noopener">Abrir PDF</a>';
+
+      await cargarRendiciones();
+    } catch (err) {
+      status.className = 'error';
+      status.style.display = 'block';
+      status.textContent = '❌ ' + err.message;
+    } finally {
+      generarBtn.textContent = 'Generar reporte PDF';
+      actualizarTotal();
+    }
+  });
+
+  cargarRendiciones();
+</script>
+</body>
+</html>
