@@ -74,7 +74,7 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   }
   label { display: block; margin-top: 16px; font-weight: 600; font-size: 14px; }
-  input[type=text], input[type=number], select {
+  input[type=text], input[type=number], input[type=date], select {
     width: 100%;
     padding: 10px;
     font-size: 16px;
@@ -125,11 +125,15 @@
   </nav>
 
   <h1>Rendición de cuentas</h1>
-  <p class="subtitle">Sacá la foto de la boleta, indicá quién hizo el gasto y el monto, y el sistema clasifica y guarda el resto.</p>
+  <p class="subtitle">Sacá la foto de la boleta, indicá quién hizo el gasto, la fecha y el monto, y el sistema clasifica y guarda el resto.</p>
 
   <form id="form">
     <label>Foto de la boleta
       <input type="file" name="foto" accept="image/*" capture="environment" required>
+    </label>
+
+    <label>Fecha del gasto
+      <input type="date" name="fechaGasto" id="fechaGasto" required>
     </label>
 
     <label>¿Quién gastó?
@@ -167,6 +171,10 @@
   const submitBtn = document.getElementById('submitBtn');
   const quienGastoSelect = document.getElementById('quienGastoSelect');
   const quienGastoOtro = document.getElementById('quienGastoOtro');
+  const fechaGastoInput = document.getElementById('fechaGasto');
+
+  // Por defecto, hoy (se puede cambiar con el calendario desplegable)
+  fechaGastoInput.valueAsDate = new Date();
 
   quienGastoSelect.addEventListener('change', () => {
     if (quienGastoSelect.value === '__otro__') {
@@ -229,6 +237,11 @@
         throw new Error('Ingresá un monto válido.');
       }
 
+      const fechaGasto = fechaGastoInput.value; // formato 'YYYY-MM-DD'
+      if (!fechaGasto) {
+        throw new Error('Falta indicar la fecha del gasto.');
+      }
+
       const fileInput = form.querySelector('input[name=foto]');
       const original = fileInput.files[0];
       const { base64Data, mimeType } = await compressImageToBase64(original);
@@ -240,7 +253,7 @@
       const res = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ fileName, mimeType, base64Data, quienGasto, monto }),
+        body: JSON.stringify({ fileName, mimeType, base64Data, quienGasto, monto, fechaGasto }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Error desconocido');
@@ -253,6 +266,7 @@
         '<a href="' + data.link + '" target="_blank" rel="noopener">Ver imagen en Drive</a>';
       form.reset();
       quienGastoOtro.style.display = 'none';
+      fechaGastoInput.valueAsDate = new Date();
     } catch (err) {
       result.className = 'error';
       result.style.display = 'block';
