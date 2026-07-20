@@ -3,18 +3,73 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rendición de Cuentas</title>
+<title>Rendición de Cuentas — Puelche</title>
 <style>
   * { box-sizing: border-box; }
+  :root {
+    --puelche-blue: #1e3a5f;
+    --puelche-blue-light: #2c5282;
+    --puelche-accent: #d97706;
+    --bg: #f4f6f8;
+  }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     max-width: 480px;
-    margin: 40px auto;
+    margin: 0 auto;
     padding: 0 16px 40px;
     color: #1f2937;
-    background: #f9fafb;
+    background: var(--bg);
   }
-  h1 { font-size: 22px; margin-bottom: 4px; }
+  header.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 0 12px;
+  }
+  header.brand .logo-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: var(--puelche-blue);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+  header.brand .brand-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--puelche-blue);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  nav.tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  nav.tabs a {
+    flex: 1;
+    text-align: center;
+    padding: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--puelche-blue);
+    background: white;
+    border: 1px solid #d1d5db;
+  }
+  nav.tabs a.active {
+    background: var(--puelche-blue);
+    color: white;
+    border-color: var(--puelche-blue);
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; color: #111827; }
   p.subtitle { color: #6b7280; font-size: 14px; margin-top: 0; }
   form {
     background: white;
@@ -23,13 +78,15 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   }
   label { display: block; margin-top: 16px; font-weight: 600; font-size: 14px; }
-  input[type=text] {
+  input[type=text], input[type=number], select {
     width: 100%;
     padding: 10px;
     font-size: 16px;
     border: 1px solid #d1d5db;
     border-radius: 8px;
     margin-top: 6px;
+    background: white;
+    font-family: inherit;
   }
   input[type=file] { margin-top: 8px; width: 100%; }
   button {
@@ -38,12 +95,13 @@
     padding: 12px;
     font-size: 16px;
     font-weight: 600;
-    background: #2563eb;
+    background: var(--puelche-blue);
     color: white;
     border: none;
     border-radius: 8px;
     cursor: pointer;
   }
+  button:hover { background: var(--puelche-blue-light); }
   button:disabled { background: #93b4e8; cursor: not-allowed; }
   #result {
     margin-top: 16px;
@@ -56,20 +114,47 @@
   #result.ok { background: #ecfdf5; border: 1px solid #10b981; }
   #result.error { background: #fef2f2; border: 1px solid #ef4444; }
   #spinner { display: none; margin-top: 16px; text-align: center; color: #6b7280; font-size: 14px; }
-  a { color: #2563eb; }
+  a { color: var(--puelche-blue-light); }
 </style>
 </head>
 <body>
+  <header class="brand">
+    <div class="logo-badge">PH</div>
+    <div class="brand-name">Puelche</div>
+  </header>
+
+  <nav class="tabs">
+    <a href="index.html" class="active">Subir boleta</a>
+    <a href="reportes.html">Reportes</a>
+  </nav>
+
   <h1>Rendición de cuentas</h1>
-  <p class="subtitle">Sacá la foto de la boleta, indicá quién hizo el gasto, y el sistema la clasifica y la guarda sola.</p>
+  <p class="subtitle">Sacá la foto de la boleta, indicá quién hizo el gasto y el monto, y el sistema clasifica y guarda el resto.</p>
 
   <form id="form">
     <label>Foto de la boleta
       <input type="file" name="foto" accept="image/*" capture="environment" required>
     </label>
+
     <label>¿Quién gastó?
-      <input type="text" name="quienGasto" placeholder="Nombre y apellido" required>
+      <select name="quienGastoSelect" id="quienGastoSelect" required>
+        <option value="" disabled selected>Elegir...</option>
+        <option>Gloria Tironi</option>
+        <option>Monica Lira</option>
+        <option>Gonzalo Swett</option>
+        <option>Catalina del Valle</option>
+        <option>Rosario Arratia</option>
+        <option>Carla Cerón</option>
+        <option>María José Castaño</option>
+        <option value="__otro__">Otro (agregar nombre)</option>
+      </select>
     </label>
+    <input type="text" id="quienGastoOtro" placeholder="Escribir nombre y apellido" style="display:none; margin-top:8px;">
+
+    <label>Monto
+      <input type="number" name="monto" id="monto" step="0.01" min="0" placeholder="0.00" required>
+    </label>
+
     <button type="submit" id="submitBtn">Subir boleta</button>
   </form>
 
@@ -84,6 +169,19 @@
   const result = document.getElementById('result');
   const spinner = document.getElementById('spinner');
   const submitBtn = document.getElementById('submitBtn');
+  const quienGastoSelect = document.getElementById('quienGastoSelect');
+  const quienGastoOtro = document.getElementById('quienGastoOtro');
+
+  quienGastoSelect.addEventListener('change', () => {
+    if (quienGastoSelect.value === '__otro__') {
+      quienGastoOtro.style.display = 'block';
+      quienGastoOtro.required = true;
+      quienGastoOtro.focus();
+    } else {
+      quienGastoOtro.style.display = 'none';
+      quienGastoOtro.required = false;
+    }
+  });
 
   // Comprime la foto en el celular antes de subirla (más rápido) y la
   // devuelve como base64, listo para mandar en el JSON al Apps Script.
@@ -122,8 +220,20 @@
         throw new Error('Falta configurar APPS_SCRIPT_URL en este archivo (index.html).');
       }
 
+      const quienGasto = quienGastoSelect.value === '__otro__'
+        ? quienGastoOtro.value.trim()
+        : quienGastoSelect.value;
+
+      if (!quienGasto) {
+        throw new Error('Falta indicar quién hizo el gasto.');
+      }
+
+      const monto = parseFloat(document.getElementById('monto').value);
+      if (isNaN(monto) || monto <= 0) {
+        throw new Error('Ingresá un monto válido.');
+      }
+
       const fileInput = form.querySelector('input[name=foto]');
-      const quienGasto = form.querySelector('input[name=quienGasto]').value.trim();
       const original = fileInput.files[0];
       const { base64Data, mimeType } = await compressImageToBase64(original);
       const fileName = Date.now() + '_' + quienGasto.replace(/\s+/g, '_') + '.jpg';
@@ -134,7 +244,7 @@
       const res = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ fileName, mimeType, base64Data, quienGasto }),
+        body: JSON.stringify({ fileName, mimeType, base64Data, quienGasto, monto }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Error desconocido');
@@ -146,6 +256,7 @@
         'Categoría detectada: <b>' + data.categoria + '</b><br>' +
         '<a href="' + data.link + '" target="_blank" rel="noopener">Ver imagen en Drive</a>';
       form.reset();
+      quienGastoOtro.style.display = 'none';
     } catch (err) {
       result.className = 'error';
       result.style.display = 'block';
