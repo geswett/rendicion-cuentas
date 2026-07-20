@@ -7,9 +7,12 @@
 <style>
   * { box-sizing: border-box; }
   :root {
-    --puelche-blue: #1e3a5f;
-    --puelche-blue-light: #2c5282;
-    --bg: #f4f6f8;
+    --puelche-green: #1a6b4a;
+    --puelche-green-dark: #145a3d;
+    --badge-green-text: #1a6b53;
+    --badge-green-bg: #e8f5f0;
+    --border-tan: #d8d5ce;
+    --bg: #f7f6f3;
   }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -20,31 +23,24 @@
     background: var(--bg);
   }
   header.brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 20px 0 12px;
+    padding: 18px 0 14px;
+    border-bottom: 1px solid var(--border-tan);
+    margin-bottom: 16px;
   }
-  header.brand .logo-badge {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    background: var(--puelche-blue);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  header.brand .wordmark {
+    font-family: Georgia, "Times New Roman", serif;
     font-weight: 700;
-    font-size: 15px;
-    letter-spacing: 0.5px;
-    flex-shrink: 0;
+    font-size: 20px;
+    line-height: 0.95;
+    color: #1f2937;
   }
-  header.brand .brand-name {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--puelche-blue);
+  header.brand .wordmark span { display: block; }
+  header.brand .tagline {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: #9ca3af;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    margin-top: 2px;
   }
   nav.tabs {
     display: flex;
@@ -59,21 +55,22 @@
     font-weight: 600;
     border-radius: 8px;
     text-decoration: none;
-    color: var(--puelche-blue);
+    color: var(--puelche-green);
     background: white;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-tan);
   }
   nav.tabs a.active {
-    background: var(--puelche-blue);
+    background: var(--puelche-green);
     color: white;
-    border-color: var(--puelche-blue);
+    border-color: var(--puelche-green);
   }
   h1 { font-size: 20px; margin: 0 0 4px; color: #111827; }
   p.subtitle { color: #6b7280; font-size: 14px; margin-top: 0; }
   .card {
     background: white;
     border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    border: 1px solid var(--border-tan);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     padding: 12px;
     margin-top: 12px;
   }
@@ -88,7 +85,7 @@
     font-weight: 600;
   }
   .badge.pendiente { background: #fef3c7; color: #92400e; }
-  .badge.rendida { background: #d1fae5; color: #065f46; }
+  .badge.rendida { background: var(--badge-green-bg); color: var(--badge-green-text); }
   .toolbar {
     display: flex;
     justify-content: space-between;
@@ -102,13 +99,13 @@
     padding: 10px 18px;
     font-size: 14px;
     font-weight: 600;
-    background: var(--puelche-blue);
+    background: var(--puelche-green);
     color: white;
     border: none;
     border-radius: 8px;
     cursor: pointer;
   }
-  button:hover { background: var(--puelche-blue-light); }
+  button:hover { background: var(--puelche-green-dark); }
   button:disabled { background: #9ca3af; cursor: not-allowed; }
   #status {
     margin-top: 14px;
@@ -117,16 +114,16 @@
     font-size: 14px;
     display: none;
   }
-  #status.ok { background: #ecfdf5; border: 1px solid #10b981; display: block; }
+  #status.ok { background: var(--badge-green-bg); border: 1px solid var(--puelche-green); display: block; }
   #status.error { background: #fef2f2; border: 1px solid #ef4444; display: block; }
   #loading { text-align: center; color: #6b7280; font-size: 14px; padding: 20px 0; }
-  a { color: var(--puelche-blue-light); }
+  a { color: var(--puelche-green); }
 </style>
 </head>
 <body>
   <header class="brand">
-    <div class="logo-badge">PH</div>
-    <div class="brand-name">Puelche</div>
+    <div class="wordmark"><span>Puel</span><span>che.</span></div>
+    <div class="tagline">Human Consulting</div>
   </header>
 
   <nav class="tabs">
@@ -211,7 +208,7 @@
       cb.addEventListener('change', actualizarTotal);
     });
     actualizarTotal();
-  } 
+  }
 
   async function cargarRendiciones() {
     loading.style.display = 'block';
