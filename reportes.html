@@ -77,6 +77,24 @@
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #e5e7eb; }
   th { color: #6b7280; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+  td select {
+    font-size: 13px;
+    padding: 4px 6px;
+    border: 1px solid var(--border-tan);
+    border-radius: 6px;
+    background: white;
+    font-family: inherit;
+    max-width: 140px;
+  }
+  .guardado {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 11px;
+    color: var(--badge-green-text);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .guardado.show { opacity: 1; }
   .badge {
     display: inline-block;
     padding: 2px 8px;
@@ -174,8 +192,62 @@
 
   let rendiciones = [];
 
+  const CATEGORIAS = [
+    'Comida',
+    'Compras Oficina',
+    'Combustible',
+    'Pasajes',
+    'Estacionamiento',
+    'Tramites Administrativos',
+    'Peajes',
+    'Otros',
+  ];
+
+  const PERSONAS = [
+    'Gloria Tironi',
+    'Monica Lira',
+    'Gonzalo Swett',
+    'Catalina del Valle',
+    'Rosario Arratia',
+    'Carla Cerón',
+    'María José Castaño',
+  ];
+
   function money(n) {
-    return '$' + (Number(n) || 0).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return '$' + Math.round(Number(n) || 0).toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+
+  function soloFecha(fechaIso) {
+    if (!fechaIso) return '';
+    return new Date(fechaIso).toLocaleDateString('es-CL', { timeZone: 'America/Santiago' });
+  }
+
+  function selectHtml(options, valorActual, row, campo) {
+    // Si el valor guardado no está en la lista fija (dato antiguo/manual), se
+    // agrega igual como opción para no perderlo ni mostrarlo vacío.
+    const lista = options.includes(valorActual) || !valorActual ? options : [valorActual].concat(options);
+    const opts = lista.map((o) => '<option value="' + o + '"' + (o === valorActual ? ' selected' : '') + '>' + o + '</option>').join('');
+    return '<select data-row="' + row + '" data-campo="' + campo + '">' + opts + '</select><span class="guardado">✓ Guardado</span>';
+  }
+
+  async function guardarEdicion(row, campo, valor, spanGuardado) {
+    try {
+      const res = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'editar', row, campo, valor }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'No se pudo guardar el cambio.');
+      if (spanGuardado) {
+        spanGuardado.classList.add('show');
+        setTimeout(() => spanGuardado.classList.remove('show'), 1500);
+      }
+    } catch (err) {
+      status.className = 'error';
+      status.style.display = 'block';
+      status.textContent = '❌ ' + err.message;
+    }
   }
 
   function actualizarTotal() {
@@ -190,13 +262,13 @@
     rendiciones.forEach((r) => {
       const tr = document.createElement('tr');
       const esRendida = (r.estado || '').toLowerCase() === 'rendida';
-      const fecha = r.fecha ? new Date(r.fecha).toLocaleString('es-CL') : '';
+      const fecha = soloFecha(r.fecha);
 
       tr.innerHTML =
         '<td><input type="checkbox" data-row="' + r.rowNumber + '" data-monto="' + r.monto + '" ' + (esRendida ? 'disabled' : '') + '></td>' +
         '<td>' + fecha + '</td>' +
-        '<td>' + (r.quien || '') + '</td>' +
-        '<td>' + (r.categoria || '') + '</td>' +
+        '<td>' + selectHtml(PERSONAS, r.quien || '', r.rowNumber, 'quien') + '</td>' +
+        '<td>' + selectHtml(CATEGORIAS, r.categoria || '', r.rowNumber, 'categoria') + '</td>' +
         '<td>' + money(r.monto) + '</td>' +
         '<td>' + (r.link ? '<a href="' + r.link + '" target="_blank" rel="noopener">Ver</a>' : '') + '</td>' +
         '<td><span class="badge ' + (esRendida ? 'rendida' : 'pendiente') + '">' + (r.estado || 'Pendiente') + '</span></td>';
@@ -207,6 +279,16 @@
     tbody.querySelectorAll('input[type=checkbox]').forEach((cb) => {
       cb.addEventListener('change', actualizarTotal);
     });
+
+    tbody.querySelectorAll('select[data-campo]').forEach((sel) => {
+      sel.addEventListener('change', () => {
+        const row = Number(sel.dataset.row);
+        const campo = sel.dataset.campo;
+        const spanGuardado = sel.nextElementSibling;
+        guardarEdicion(row, campo, sel.value, spanGuardado);
+      });
+    });
+
     actualizarTotal();
   }
 
