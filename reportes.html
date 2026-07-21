@@ -77,24 +77,38 @@
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #e5e7eb; }
   th { color: #6b7280; font-weight: 600; font-size: 12px; text-transform: uppercase; }
-  td select {
+  td select, td input[type=number] {
     font-size: 13px;
     padding: 4px 6px;
-    border: 1px solid var(--border-tan);
+    border: 1px solid var(--puelche-green);
     border-radius: 6px;
     background: white;
     font-family: inherit;
     max-width: 140px;
   }
-  .guardado {
-    display: inline-block;
-    margin-left: 6px;
-    font-size: 11px;
-    color: var(--badge-green-text);
-    opacity: 0;
-    transition: opacity 0.2s;
+  td.fecha-cell { white-space: nowrap; }
+  .celda-editable {
+    cursor: pointer;
+    border-bottom: 1px dashed transparent;
+    padding: 2px 0;
   }
-  .guardado.show { opacity: 1; }
+  .celda-editable:hover {
+    border-bottom-color: var(--puelche-green);
+  }
+  .filtros {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .filtros select {
+    font-size: 13px;
+    padding: 6px 8px;
+    border: 1px solid var(--border-tan);
+    border-radius: 8px;
+    background: white;
+    font-family: inherit;
+  }
   .badge {
     display: inline-block;
     padding: 2px 8px;
@@ -155,6 +169,14 @@
   <div id="loading">Cargando rendiciones…</div>
 
   <div class="card" id="tableCard" style="display:none;">
+    <div class="filtros">
+      <select id="filtroPersona"><option value="">Todas las personas</option></select>
+      <select id="filtroEstado">
+        <option value="">Todos los estados</option>
+        <option value="Pendiente">Pendiente</option>
+        <option value="Rendida">Rendida</option>
+      </select>
+    </div>
     <table>
       <thead>
         <tr>
@@ -189,6 +211,8 @@
   const generarBtn = document.getElementById('generarBtn');
   const totalSeleccionado = document.getElementById('totalSeleccionado');
   const status = document.getElementById('status');
+  const filtroPersona = document.getElementById('filtroPersona');
+  const filtroEstado = document.getElementById('filtroEstado');
 
   let rendiciones = [];
 
@@ -222,15 +246,7 @@
     return new Date(fechaIso).toLocaleDateString('es-CL', { timeZone: 'America/Santiago' });
   }
 
-  function selectHtml(options, valorActual, row, campo) {
-    // Si el valor guardado no está en la lista fija (dato antiguo/manual), se
-    // agrega igual como opción para no perderlo ni mostrarlo vacío.
-    const lista = options.includes(valorActual) || !valorActual ? options : [valorActual].concat(options);
-    const opts = lista.map((o) => '<option value="' + o + '"' + (o === valorActual ? ' selected' : '') + '>' + o + '</option>').join('');
-    return '<select data-row="' + row + '" data-campo="' + campo + '">' + opts + '</select><span class="guardado">✓ Guardado</span>';
-  }
-
-  async function guardarEdicion(row, campo, valor, spanGuardado) {
+  async function guardarEdicion(row, campo, valor) {
     try {
       const res = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
@@ -239,16 +255,96 @@
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'No se pudo guardar el cambio.');
-      if (spanGuardado) {
-        spanGuardado.classList.add('show');
-        setTimeout(() => spanGuardado.classList.remove('show'), 1500);
-      }
     } catch (err) {
       status.className = 'error';
       status.style.display = 'block';
       status.textContent = '❌ ' + err.message;
     }
   }
+
+  function crearSpanEditable(campo, row, valorMostrado) {
+    const span = document.createElement('span');
+    span.className = 'celda-editable';
+    span.dataset.row = row;
+    span.dataset.campo = campo;
+    span.textContent = valorMostrado;
+    return span;
+  }
+
+  // Convierte una celda de texto en un <select> o <input> editable al
+  // hacer click. Al guardar (o al perder el foco), vuelve a texto plano.
+  function iniciarEdicion(span) {
+    if (span.dataset.editando) return;
+    span.dataset.editando = '1';
+    const row = Number(span.dataset.row);
+    const campo = span.dataset.campo;
+    const original = rendiciones.find((r) => r.rowNumber === row);
+    if (!original) return;
+
+    if (campo === 'monto') {
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.step = '1';
+      input.value = original.monto;
+      let resuelto = false;
+
+      const cerrar = (guardar) => {
+        if (resuelto) return;
+        resuelto = true;
+        const nuevo = Number(input.value);
+        if (guardar && !isNaN(nuevo) && nuevo > 0 && nuevo !== Number(original.monto)) {
+          original.monto = nuevo;
+          const cb = tbody.querySelector('input[type=checkbox][data-row="' + row + '"]');
+          if (cb) cb.dataset.monto = nuevo;
+          guardarEdicion(row, 'monto', String(nuevo));
+        }
+        const nuevoSpan = crearSpanEditable('monto', row, money(original.monto));
+        input.replaceWith(nuevoSpan);
+        actualizarTotal();
+      };
+
+      input.addEventListener('blur', () => cerrar(true));
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') input.blur();
+        if (ev.key === 'Escape') { input.value = original.monto; input.blur(); }
+      });
+
+      span.replaceWith(input);
+      input.focus();
+      input.select();
+    } else {
+      const options = campo === 'quien' ? PERSONAS : CATEGORIAS;
+      const valorActual = campo === 'quien' ? (original.quien || '') : (original.categoria || '');
+      const lista = options.includes(valorActual) || !valorActual ? options : [valorActual].concat(options);
+      const select = document.createElement('select');
+      select.innerHTML = lista.map((o) => '<option value="' + o + '"' + (o === valorActual ? ' selected' : '') + '>' + o + '</option>').join('');
+      let resuelto = false;
+
+      const cerrar = (guardar) => {
+        if (resuelto) return;
+        resuelto = true;
+        const nuevo = select.value;
+        if (guardar && nuevo !== valorActual) {
+          if (campo === 'quien') original.quien = nuevo; else original.categoria = nuevo;
+          guardarEdicion(row, campo, nuevo);
+        }
+        const nuevoSpan = crearSpanEditable(campo, row, campo === 'quien' ? original.quien : original.categoria);
+        select.replaceWith(nuevoSpan);
+      };
+
+      select.addEventListener('change', () => cerrar(true));
+      select.addEventListener('blur', () => cerrar(false));
+
+      span.replaceWith(select);
+      select.focus();
+      try { select.showPicker && select.showPicker(); } catch (e) { /* no soportado, no pasa nada */ }
+    }
+  }
+
+  tbody.addEventListener('click', (e) => {
+    const span = e.target.closest('.celda-editable');
+    if (span) iniciarEdicion(span);
+  });
 
   function actualizarTotal() {
     const seleccionadas = Array.from(tbody.querySelectorAll('input[type=checkbox]:checked'));
@@ -257,19 +353,37 @@
     generarBtn.disabled = seleccionadas.length === 0;
   }
 
+  function poblarFiltroPersona() {
+    const distintos = Array.from(new Set(rendiciones.map((r) => r.quien).filter(Boolean)));
+    const combinados = Array.from(new Set(PERSONAS.concat(distintos)));
+    const actual = filtroPersona.value;
+    filtroPersona.innerHTML = '<option value="">Todas las personas</option>' +
+      combinados.map((p) => '<option value="' + p + '">' + p + '</option>').join('');
+    filtroPersona.value = actual;
+  }
+
   function render() {
     tbody.innerHTML = '';
-    rendiciones.forEach((r) => {
+
+    const fp = filtroPersona.value;
+    const fe = filtroEstado.value;
+    const filtradas = rendiciones.filter((r) => {
+      if (fp && r.quien !== fp) return false;
+      if (fe && (r.estado || 'Pendiente').toLowerCase() !== fe.toLowerCase()) return false;
+      return true;
+    });
+
+    filtradas.forEach((r) => {
       const tr = document.createElement('tr');
       const esRendida = (r.estado || '').toLowerCase() === 'rendida';
       const fecha = soloFecha(r.fecha);
 
       tr.innerHTML =
         '<td><input type="checkbox" data-row="' + r.rowNumber + '" data-monto="' + r.monto + '" ' + (esRendida ? 'disabled' : '') + '></td>' +
-        '<td>' + fecha + '</td>' +
-        '<td>' + selectHtml(PERSONAS, r.quien || '', r.rowNumber, 'quien') + '</td>' +
-        '<td>' + selectHtml(CATEGORIAS, r.categoria || '', r.rowNumber, 'categoria') + '</td>' +
-        '<td>' + money(r.monto) + '</td>' +
+        '<td class="fecha-cell">' + fecha + '</td>' +
+        '<td><span class="celda-editable" data-row="' + r.rowNumber + '" data-campo="quien">' + (r.quien || '') + '</span></td>' +
+        '<td><span class="celda-editable" data-row="' + r.rowNumber + '" data-campo="categoria">' + (r.categoria || '') + '</span></td>' +
+        '<td><span class="celda-editable" data-row="' + r.rowNumber + '" data-campo="monto">' + money(r.monto) + '</span></td>' +
         '<td>' + (r.link ? '<a href="' + r.link + '" target="_blank" rel="noopener">Ver</a>' : '') + '</td>' +
         '<td><span class="badge ' + (esRendida ? 'rendida' : 'pendiente') + '">' + (r.estado || 'Pendiente') + '</span></td>';
 
@@ -280,17 +394,11 @@
       cb.addEventListener('change', actualizarTotal);
     });
 
-    tbody.querySelectorAll('select[data-campo]').forEach((sel) => {
-      sel.addEventListener('change', () => {
-        const row = Number(sel.dataset.row);
-        const campo = sel.dataset.campo;
-        const spanGuardado = sel.nextElementSibling;
-        guardarEdicion(row, campo, sel.value, spanGuardado);
-      });
-    });
-
     actualizarTotal();
   }
+
+  filtroPersona.addEventListener('change', render);
+  filtroEstado.addEventListener('change', render);
 
   async function cargarRendiciones() {
     loading.style.display = 'block';
@@ -300,6 +408,7 @@
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'No se pudo cargar el listado.');
       rendiciones = data.rendiciones || [];
+      poblarFiltroPersona();
       render();
       tableCard.style.display = 'block';
     } catch (err) {
